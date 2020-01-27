@@ -1,11 +1,9 @@
-mod bit_grid;
-use bit_grid::BitGrid;
+mod checkers;
+use checkers::board::{Board, Player1, Player2};
 
 fn main() {
-    let mut bs = BitGrid::new();
+    let board = Board::new();
 
-    println!("Bitset: {:?}", bs);
-
-    bs.set(3, 7, true);
-    println!("Bitset: {:?}", bs);
+    board.legal_moves(Player1);
+    // println!("bs1: {:?}", board);
 }
