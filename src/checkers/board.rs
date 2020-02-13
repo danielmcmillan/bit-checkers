@@ -1,10 +1,11 @@
-use crate::checkers::util::BitGrid;
+use super::util::BitGrid;
 use std::fmt;
 
-const BOARD_WIDTH: usize = 8;
-const BOARD_HEIGHT: usize = 8;
+const BOARD_WIDTH: u32 = 8;
+const BOARD_HEIGHT: u32 = 8;
 const BOARD_MASK: u64 = 0x55AA55AA55AA55AA;
 
+#[derive(Clone, Copy, fmt::Debug)]
 pub enum Player {
     Player1,
     Player2,
@@ -16,74 +17,133 @@ pub struct Board {
     player2: PlayerBoard,
 }
 
+#[derive(Clone, Copy, fmt::Debug)]
+pub struct Position(pub u32, pub u32);
+
+#[derive(Clone, Copy, fmt::Debug)]
+pub struct Move {
+    pub from: Position,
+    pub to: Position,
+}
+
+impl Move {
+    fn new(from: Position, offset: (i32, i32)) -> Move {
+        Move {
+            from: Position(from.0, from.1),
+            to: Position(
+                ((from.0 as i32) + offset.0) as u32,
+                ((from.1 as i32) + offset.1) as u32,
+            ),
+        }
+    }
+}
+
 struct PlayerBoard {
     pub all: BitGrid,
     pub kings: BitGrid,
 }
 
 impl Board {
-    // get all legal moves (must be jump if possible)
-    // perform a move or jump (assuming it is legal)
-
+    /// Creates a new board with pieces in the initial positions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let board = bit_checkers::Board::new();
+    /// ```
     pub fn new() -> Board {
         Board {
-            player1: PlayerBoard::new(false),
-            player2: PlayerBoard::new(true),
+            player1: PlayerBoard {
+                all: BitGrid::new_from_mask(BOARD_MASK << 40 >> 40),
+                kings: BitGrid::new(),
+            },
+            player2: PlayerBoard {
+                all: BitGrid::new_from_mask(BOARD_MASK >> 40 << 40),
+                kings: BitGrid::new(),
+            },
         }
     }
 
-    pub fn legal_moves(&self, player: Player) {
-        let available_squares = self
-            .player1
+    pub fn move_piece(mut self, player: Player, Move { from, to }: Move) -> Board {
+        // Todo: create kings
+        let player_board = match player {
+            Player1 => &mut self.player1,
+            Player2 => &mut self.player2,
+        };
+        player_board.all = player_board
             .all
-            .union(self.player2.all)
-            .negate()
-            .intersect(BitGrid::new_from_mask(BOARD_MASK));
+            .set_at_cell(from.0, from.1, false)
+            .set_at_cell(to.0, to.1, true);
+        if player_board.kings.get_at_cell(from.0, from.1) {
+            player_board.kings = player_board
+                .kings
+                .set_at_cell(from.0, from.1, false)
+                .set_at_cell(to.0, to.1, true);
+        }
 
-        let downward_moving = match player {
-            Player1 => self.player1.all,
-            Player2 => self.player2.kings,
+        self
+    }
+
+    pub fn normal_moves(&self, player: Player) -> impl Iterator<Item = Move> {
+        let downward_moving = self.downward_moving(player);
+        let upward_moving = self.upward_moving(player);
+
+        let get_moves = |moving, vertical: i32, horizontal: i32| {
+            self.empty_squares()
+                .shift(-vertical, -horizontal)
+                .intersect(moving)
+                .iter_set_cells()
+                .map(move |(x, y)| Move::new(Position(x, y), (horizontal, vertical)))
         };
-        let upward_moving = match player {
-            Player1 => self.player1.kings,
-            Player2 => self.player2.all,
-        };
+
+        get_moves(downward_moving, 1, -1)
+            .chain(get_moves(downward_moving, 1, 1))
+            .chain(get_moves(upward_moving, -1, -1))
+            .chain(get_moves(upward_moving, -1, 1))
+    }
+
+    pub fn jump_moves(&self, player: Player) -> impl Iterator<Item = Move> {
+        let downward_moving = self.downward_moving(player);
+        let upward_moving = self.upward_moving(player);
         let opponents = match player {
             Player1 => self.player2.all,
             Player2 => self.player1.all,
         };
 
-        // Down-left moves
-        let result = available_squares.shift(-1, 1).intersect(downward_moving);
-        println!("{:?}", result);
-        // Down-right moves
-        let result = available_squares.shift(-1, -1).intersect(downward_moving);
-        println!("{:?}", result);
-        // Up-left moves
-        let result = available_squares.shift(1, 1).intersect(upward_moving);
-        println!("{:?}", result);
-        // Up-right moves
-        let result = available_squares.shift(1, -1).intersect(upward_moving);
-        println!("{:?}", result);
+        let get_jumps = |moving, vertical: i32, horizontal: i32| {
+            self.empty_squares()
+                .shift(-vertical * 2, -horizontal * 2)
+                .intersect(opponents.shift(-vertical, -horizontal))
+                .intersect(moving)
+                .iter_set_cells()
+                .map(move |(x, y)| Move::new(Position(x, y), (horizontal * 2, vertical * 2)))
+        };
 
-        // Down-left jumps
-        let result = available_squares
-            .shift(-2, 2)
-            .intersect(opponents.shift(-1, 1))
-            .intersect(downward_moving);
-        println!("Down-left jumps: {:?}", result);
+        get_jumps(downward_moving, 1, -1)
+            .chain(get_jumps(downward_moving, 1, 1))
+            .chain(get_jumps(upward_moving, -1, -1))
+            .chain(get_jumps(upward_moving, -1, 1))
     }
-}
 
-impl PlayerBoard {
-    fn new(player2: bool) -> PlayerBoard {
-        PlayerBoard {
-            all: BitGrid::new_from_mask(if player2 {
-                BOARD_MASK >> 40 << 40
-            } else {
-                BOARD_MASK << 40 >> 40
-            }),
-            kings: BitGrid::new(),
+    fn empty_squares(&self) -> BitGrid {
+        self.player1
+            .all
+            .union(self.player2.all)
+            .negate()
+            .intersect(BitGrid::new_from_mask(BOARD_MASK))
+    }
+
+    fn downward_moving(&self, player: Player) -> BitGrid {
+        match player {
+            Player1 => self.player1.all,
+            Player2 => self.player2.kings,
+        }
+    }
+
+    fn upward_moving(&self, player: Player) -> BitGrid {
+        match player {
+            Player1 => self.player1.kings,
+            Player2 => self.player2.all,
         }
     }
 }
