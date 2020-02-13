@@ -1,5 +1,4 @@
-mod checkers;
-use checkers::board::{Board, Player1, Player2};
+use bit_checkers::{Board, Move, Player1, Player2, Position};
 
 fn main() {
     let board = Board::new();

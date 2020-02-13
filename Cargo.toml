@@ -1,5 +1,5 @@
 [package]
-name = "bit-checkers"
+name = "bit_checkers"
 version = "0.1.0"
 authors = ["Daniel McMillan <mcmillan.daniel3@gmail.com>"]
 edition = "2018"

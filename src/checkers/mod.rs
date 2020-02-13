@@ -1,2 +1,2 @@
 pub mod board;
-mod util;
+pub mod util;
