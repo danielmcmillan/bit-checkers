@@ -22,7 +22,7 @@ pub struct Board {
 #[derive(Clone, Copy, PartialEq, fmt::Debug)]
 pub struct Position(pub u32, pub u32);
 
-#[derive(Clone, Copy, fmt::Debug)]
+#[derive(Clone, Copy, PartialEq, fmt::Debug)]
 pub struct Move {
     pub from: Position,
     pub to: Position,
@@ -112,9 +112,9 @@ impl Board {
     /// # Examples
     ///
     /// ```
-    /// let board = bit_checkers::Board::new();
-    /// let a_move = board.normal_moves(bit_checkers::Player1).next().unwrap();
-    /// let board = board.move_piece(bit_checkers::Player1, a_move);
+    /// let board = bit_checkers::board::Board::new();
+    /// let a_move = board.normal_moves(bit_checkers::board::Player1).next().unwrap();
+    /// let board = board.move_piece(bit_checkers::board::Player1, a_move);
     /// ```
     pub fn move_piece(mut self, player: Player, Move { from, to }: Move) -> Board {
         // Todo: create kings
@@ -138,6 +138,19 @@ impl Board {
         self
     }
 
+    /// Returns an iterator over non-jump moves that the given player can make.
+    /// Note: these are only allowed in a normal game if there are no jump moves available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let board = bit_checkers::board::Board::new();
+    /// let a_move = board
+    ///     .normal_moves(bit_checkers::board::Player1)
+    ///     .next()
+    ///     .unwrap();
+    /// let bit_checkers::board::Move { from, to } = a_move;
+    /// ```
     pub fn normal_moves(&self, player: Player) -> impl Iterator<Item = Move> {
         let downward_moving = self.downward_moving(player);
         let upward_moving = self.upward_moving(player);
@@ -156,6 +169,18 @@ impl Board {
             .chain(get_moves(upward_moving, -1, 1))
     }
 
+    /// Returns an iterator over jump moves that the given player can make.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let board = bit_checkers::board::Board::new();
+    /// let jump_move = board
+    ///     .jump_moves(bit_checkers::board::Player1)
+    ///     .next();
+    ///
+    /// assert!(jump_move.is_none());
+    /// ```
     pub fn jump_moves(&self, player: Player) -> impl Iterator<Item = Move> {
         let downward_moving = self.downward_moving(player);
         let upward_moving = self.upward_moving(player);
@@ -179,6 +204,24 @@ impl Board {
             .chain(get_jumps(upward_moving, -1, 1))
     }
 
+    /// Returns the winning player based on the current board, or None if the game is still in
+    /// progress.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let new_board = bit_checkers::board::Board::new();
+    /// let complete_board = bit_checkers::board::Board::new_with_pieces(vec![
+    ///     bit_checkers::board::Piece {
+    ///         player: bit_checkers::board::Player1,
+    ///         king: false,
+    ///         position: bit_checkers::board::Position(5, 6),
+    ///     }
+    /// ]);
+    ///
+    /// assert!(new_board.winner().is_none());
+    /// assert_eq!(complete_board.winner(), Some(bit_checkers::board::Player1));
+    /// ```
     pub fn winner(&self) -> Option<Player> {
         if self.player1.all.none() {
             Some(Player2)
@@ -189,6 +232,21 @@ impl Board {
         }
     }
 
+    /// Returns an iterator over all pieces on the board.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let board = bit_checkers::board::Board::new_with_pieces(vec![
+    ///     bit_checkers::board::Piece {
+    ///         player: bit_checkers::board::Player1,
+    ///         king: false,
+    ///         position: bit_checkers::board::Position(5, 6),
+    ///     }
+    /// ]);
+    /// let piece = board.pieces_iter().next().unwrap();
+    ///
+    /// assert_eq!(piece.position, bit_checkers::board::Position(5, 6));
     pub fn pieces_iter(self) -> impl Iterator<Item = Piece> {
         [Player1, Player2].iter().flat_map(move |&player| {
             let player_board = self.player_board(player);
@@ -204,6 +262,17 @@ impl Board {
         })
     }
 
+    /// Returns the piece at the specified position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let board = bit_checkers::board::Board::new();
+    /// let piece = board.piece_at(bit_checkers::board::Position(1, 0));
+    /// let empty_spot = board.piece_at(bit_checkers::board::Position(1, 4));
+    ///
+    /// assert_eq!(piece.unwrap().player, bit_checkers::board::Player1);
+    /// assert!(empty_spot.is_none());
     pub fn piece_at(&self, position: Position) -> Option<Piece> {
         let Position(x, y) = position;
         if self.player1.kings.get_at_cell(x, y) {
@@ -235,6 +304,7 @@ impl Board {
         }
     }
 
+    /// Returns a BitGrid with flag set for valid, empty squares.
     fn empty_squares(&self) -> BitGrid {
         self.player1
             .all
@@ -243,6 +313,8 @@ impl Board {
             .intersect(BitGrid::new_from_mask(BOARD_MASK))
     }
 
+    /// Returns a BitGrid with flag set for all of the given player's pieces that can move
+    /// downwards (y+)
     fn downward_moving(&self, player: Player) -> BitGrid {
         match player {
             Player1 => self.player1.all,
@@ -250,6 +322,8 @@ impl Board {
         }
     }
 
+    /// Returns a BitGrid with flag set for all of the given player's pieces that can move
+    /// upwards (y-)
     fn upward_moving(&self, player: Player) -> BitGrid {
         match player {
             Player1 => self.player1.kings,
@@ -257,6 +331,7 @@ impl Board {
         }
     }
 
+    /// Returns a reference to the PlayerBoard struct for the given player.
     fn player_board(&self, player: Player) -> &PlayerBoard {
         match player {
             Player1 => &self.player1,
@@ -264,6 +339,7 @@ impl Board {
         }
     }
 
+    /// Returns a mutable reference to the PlayerBoard struct for the given player.
     fn player_board_mut(&mut self, player: Player) -> &mut PlayerBoard {
         match player {
             Player1 => &mut self.player1,
@@ -381,5 +457,126 @@ mod test {
             player: Player2,
             king: true
         }));
+    }
+
+    #[test]
+    fn should_get_normal_moves() {
+        let board = Board::new_with_pieces(vec![
+            Piece {
+                player: Player1,
+                king: true,
+                position: Position(3, 0),
+            },
+            Piece {
+                player: Player1,
+                king: false,
+                position: Position(0, 3),
+            },
+            Piece {
+                player: Player1,
+                king: false,
+                position: Position(7, 4),
+            },
+            Piece {
+                player: Player1,
+                king: false,
+                position: Position(4, 5),
+            },
+            Piece {
+                player: Player1,
+                king: true,
+                position: Position(3, 6),
+            },
+            Piece {
+                player: Player1,
+                king: true,
+                position: Position(4, 7),
+            },
+            Piece {
+                player: Player2,
+                king: true,
+                position: Position(5, 0),
+            },
+            Piece {
+                player: Player2,
+                king: true,
+                position: Position(3, 4),
+            },
+            Piece {
+                player: Player2,
+                king: false,
+                position: Position(2, 5),
+            },
+        ]);
+
+        let player1_moves: Vec<Move> = board.normal_moves(Player1).collect();
+        let player2_moves: Vec<Move> = board.normal_moves(Player2).collect();
+
+        assert_eq!(player1_moves.len(), 7);
+        assert!(player1_moves.contains(&Move::new(Position(3, 0), (-1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(3, 0), (1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(0, 3), (1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(7, 4), (-1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(4, 5), (1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(3, 6), (-1, 1))));
+        assert!(player1_moves.contains(&Move::new(Position(4, 7), (1, -1))));
+
+        assert_eq!(player2_moves.len(), 5);
+        assert!(player2_moves.contains(&Move::new(Position(5, 0), (1, 1))));
+        assert!(player2_moves.contains(&Move::new(Position(5, 0), (-1, 1))));
+        assert!(player2_moves.contains(&Move::new(Position(3, 4), (1, -1))));
+        assert!(player2_moves.contains(&Move::new(Position(3, 4), (-1, -1))));
+        assert!(player2_moves.contains(&Move::new(Position(2, 5), (-1, -1))));
+    }
+
+    #[test]
+    fn should_get_jump_moves() {
+        let board = Board::new_with_pieces(vec![
+            Piece {
+                player: Player1,
+                king: true,
+                position: Position(0, 5),
+            },
+            Piece {
+                player: Player1,
+                king: false,
+                position: Position(2, 5),
+            },
+            Piece {
+                player: Player1,
+                king: false,
+                position: Position(3, 6),
+            },
+            Piece {
+                player: Player1,
+                king: true,
+                position: Position(0, 7),
+            },
+            Piece {
+                player: Player2,
+                king: true,
+                position: Position(1, 4),
+            },
+            Piece {
+                player: Player2,
+                king: false,
+                position: Position(1, 6),
+            },
+            Piece {
+                player: Player2,
+                king: false,
+                position: Position(4, 7),
+            },
+        ]);
+
+        let player1_moves: Vec<Move> = board.jump_moves(Player1).collect();
+        let player2_moves: Vec<Move> = board.jump_moves(Player2).collect();
+
+        assert_eq!(player1_moves.len(), 2);
+        assert!(player1_moves.contains(&Move::new(Position(0, 5), (2, -2))));
+        assert!(player1_moves.contains(&Move::new(Position(0, 5), (2, 2))));
+
+        assert_eq!(player2_moves.len(), 1);
+        assert!(player2_moves.contains(&Move::new(Position(1, 6), (2, -2))));
     }
 }

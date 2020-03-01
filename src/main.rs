@@ -1,4 +1,4 @@
-use bit_checkers::{Board, Move, Player1, Player2, Position};
+use bit_checkers::board::{Board, Move, Player1, Player2, Position};
 
 fn main() {
     let board = Board::new();
