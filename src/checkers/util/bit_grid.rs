@@ -35,6 +35,8 @@ impl BitGrid {
 
   /// Returns the data at a specified index.
   ///
+  /// Panics or returns undefined result if the index is invalid.
+  ///
   /// # Examples
   ///
   /// ```
@@ -50,6 +52,8 @@ impl BitGrid {
 
   /// Returns the data at a specified x and y coordinate.
   ///
+  /// Panics or returns undefined result if the x and y coordinate are invalid.
+  ///
   /// # Examples
   ///
   /// ```
@@ -64,6 +68,8 @@ impl BitGrid {
   }
 
   /// Returns a BitGrid with data set at the specified index.
+  ///
+  /// Panics or returns undefined result if the index is invalid.
   ///
   /// # Examples
   ///
@@ -84,6 +90,8 @@ impl BitGrid {
   }
 
   /// Returns a BitGrid with data set at the specified x and y coordinate.
+  ///
+  /// Panics or returns undefined result if the x and y coordinate are invalid.
   ///
   /// # Examples
   ///
@@ -203,6 +211,21 @@ impl BitGrid {
   /// ```
   pub fn iter_set_cells(self) -> SetCellIterator {
     self.iter_set_indexes().map(BitGrid::cell_at_index)
+  }
+
+  /// Returns whether there are no true values (all values false).
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// let empty_grid = bit_checkers::checkers::util::BitGrid::new();
+  /// let non_empty_grid = empty_grid.set_at_index(0, true);
+  ///
+  /// assert_eq!(empty_grid.none(), true);
+  /// assert_eq!(non_empty_grid.none(), false);
+  /// ```
+  pub fn none(&self) -> bool {
+    self.data == 0
   }
 
   fn index_mask(index: u32) -> DataType {
